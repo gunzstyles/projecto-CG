@@ -33,6 +33,9 @@ GLfloat cameraAngleY = 90.0;
 GLfloat cameraAngleX = 0;
 GLfloat wasd[4] = {0, 0, 0, 0};
 
+/* teste para saltar*/
+GLfloat velocidadeY = 0;
+GLfloat saltoY = 0;
 /* DEFINI‚ÌO DA COR DO NEVOEIRO */
 GLfloat nevoeiroCor[] = {0.75, 0.75, 0.75, 1.0};
 
@@ -302,8 +305,17 @@ void desenha() {
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
+    GLfloat tmpPosY = (billbilinearInterpolation(playerPosXZ[0], playerPosXZ[1]) / 256.0) * 70 + 2;
+    saltoY += velocidadeY;
+    tmpPosY += saltoY;
+    
+    velocidadeY -= 0.06;
+    if((billbilinearInterpolation(playerPosXZ[0], playerPosXZ[1]) / 256.0) * 70 + 2 > tmpPosY){
+        tmpPosY = (billbilinearInterpolation(playerPosXZ[0], playerPosXZ[1]) / 256.0) * 70 + 2;
+        velocidadeY = 0;
+    }
 
-	gluLookAt(playerPosXZ[0], (billbilinearInterpolation(playerPosXZ[0], playerPosXZ[1]) / 256.0) * 70 + 2, playerPosXZ[1], playerPosXZ[0] + mousePosXYZ[0], (billbilinearInterpolation(playerPosXZ[0], playerPosXZ[1]) / 256.0) * 70 + 2 + mousePosXYZ[1], playerPosXZ[1] + mousePosXYZ[2], 0.0, 1.0, 0.0);
+	gluLookAt(playerPosXZ[0], tmpPosY, playerPosXZ[1], playerPosXZ[0] + mousePosXYZ[0], tmpPosY + mousePosXYZ[1], playerPosXZ[1] + mousePosXYZ[2], 0.0, 1.0, 0.0);
 
 	/*desenhaReferencial();
 	glPushMatrix();
@@ -325,6 +337,7 @@ void timer(int value) {
 
 void teclasNotAscii(int key, int x, int y)
 {
+    /*
 	if (key == GLUT_KEY_LEFT) {
 		playerPosXZ[0]--;
 		glutPostRedisplay();
@@ -341,6 +354,7 @@ void teclasNotAscii(int key, int x, int y)
 		playerPosXZ[1]++;
 		glutPostRedisplay();
 	}
+     */
 }
 
 void teclado(unsigned char key, int x, int y) {
@@ -360,6 +374,12 @@ void teclado(unsigned char key, int x, int y) {
 		case 100:	// D
 			wasd[3] = 1;
 			break;
+        case 32: // ESPA‚O
+            if(saltoY < 0){
+                velocidadeY = 1;
+                saltoY = 0;
+            }
+            break;
 		default:
 			break;
 	}
