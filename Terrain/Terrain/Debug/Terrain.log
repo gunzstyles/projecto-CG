@@ -1,0 +1,14 @@
+﻿  main.cpp
+c:\users\joelp\desktop\cg\terrain\terrain\main.cpp(98): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+c:\users\joelp\desktop\cg\terrain\terrain\main.cpp(100): warning C4244: '+=': conversion from 'double' to 'float', possible loss of data
+c:\users\joelp\desktop\cg\terrain\terrain\main.cpp(161): warning C4244: 'argument': conversion from 'double' to 'GLfloat', possible loss of data
+c:\users\joelp\desktop\cg\terrain\terrain\main.cpp(164): warning C4244: 'argument': conversion from 'double' to 'GLfloat', possible loss of data
+c:\users\joelp\desktop\cg\terrain\terrain\main.cpp(269): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\users\joelp\desktop\cg\terrain\terrain\main.cpp(270): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\users\joelp\desktop\cg\terrain\terrain\main.cpp(271): warning C4244: '=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\users\joelp\desktop\cg\terrain\terrain\main.cpp(272): warning C4244: '*=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\users\joelp\desktop\cg\terrain\terrain\main.cpp(273): warning C4244: '*=': conversion from 'double' to 'GLfloat', possible loss of data
+c:\users\joelp\desktop\cg\terrain\terrain\main.cpp(275): warning C4244: '=': conversion from 'int' to 'GLfloat', possible loss of data
+c:\users\joelp\desktop\cg\terrain\terrain\main.cpp(276): warning C4244: '=': conversion from 'int' to 'GLfloat', possible loss of data
+  Terrain.vcxproj -> C:\Users\joelp\Desktop\CG\Terrain\Debug\Terrain.exe
+  Terrain.vcxproj -> C:\Users\joelp\Desktop\CG\Terrain\Debug\Terrain.pdb (Partial PDB)
