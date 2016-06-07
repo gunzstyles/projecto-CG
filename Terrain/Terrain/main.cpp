@@ -33,6 +33,9 @@ GLfloat cameraAngleY = 90.0;
 GLfloat cameraAngleX = 0;
 GLfloat wasd[4] = {0, 0, 0, 0};
 
+/* DEFINIÇÃO DA COR DO NEVOEIRO */
+GLfloat nevoeiroCor[] = {0.75, 0.75, 0.75, 1.0};
+
 double lastTime = 0;
 int nbFrames = 0;
 
@@ -124,9 +127,31 @@ void loop() {
 	expFilter(mapa256);
 }
 
+void initNevoeiro(void){
+    glFogfv(GL_FOG_COLOR, nevoeiroCor); //Cor do nevoeiro
+    glFogi(GL_FOG_MODE, GL_LINEAR); //Equação do nevoeiro - linear
+    //Outras opcoes: GL_EXP, GL_EXP2
+    glFogf(GL_FOG_START, 1.0); // Distância a que terá início o nevoeiro
+    glFogf(GL_FOG_END, 200.0); // Distância a que o nevoeiro terminará
+    //glFogf (GL_FOG_DENSITY, 0.35); //Densidade do nevoeiro - não se especifica quando temos "nevoeiro linear"
+}
+
 void init() {
 	//glClearColor(0, 0.75, 1, 1);
 	setNoise(mapa32);
+    
+    /* ACTIVAR NEVOEIRO */
+    glEnable(GL_FOG);
+    initNevoeiro();
+  
+    glEnable(GL_COLOR_MATERIAL);
+    glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE );
+    
+    
+    /*ACTIVAR FRONT CULLING*/
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT);
+    
 	loop();
 	/*std::ofstream myfile;
 	myfile.open("map256.map");
