@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
+#include <iostream>
+#include <fstream>
 
 #ifdef __APPLE__
 #include <OpenGL/OpenGL.h>
@@ -19,17 +21,20 @@
 
 float mapa32[32 * 32];
 float mapa256[256 * 256];
+float colorMap256[256 * 256][3];
+int mapMinHeight = 20;
 int windowWidth = 800, windowHeight = 600;
-float check;
+float check, colorScale;
 
-GLfloat playerPosXY[2] = {0, 0};
+GLfloat playerPosXZ[2] = {0, 0};
 GLfloat mouseScreenPosXY[2] = {0, 0};
-GLfloat mouseScreenPosXYZ[3] = {0, 0, 0};
+GLfloat mousePosXYZ[3] = {1, 0, 0};
 GLfloat cameraAngleY = 90.0;
 GLfloat cameraAngleX = 0;
+GLfloat wasd[4] = {0, 0, 0, 0};
 
-/* INTRODUÇÃO DE NEVOEIRO */
-GLfloat nevoeiroCor[] = {0.75, 0.75, 0.75, 1.0}; // definição da cor do nevoeiro
+double lastTime = 0;
+int nbFrames = 0;
 
 
 float noise(int x, int y, int aleatorio) {
@@ -47,7 +52,7 @@ void setNoise(float  *mapa) {
 
 	for (int y = 1; y<33; y++)
 		for (int x = 1; x<33; x++)
-			temp[x][y] = 128.0f + noise(x, y, aleatorio)*10.0f;
+			temp[x][y] = 128.0f + noise(x, y, aleatorio)*20.0f;
 
 	for (int x = 1; x<33; x++) {
 		temp[0][x] = temp[32][x];
@@ -119,39 +124,42 @@ void loop() {
 	expFilter(mapa256);
 }
 
-/* FUNÇÃO QUE INICIALIZA O NEVOEIRO */
-void initNevoeiro(void){
-    glFogfv(GL_FOG_COLOR, nevoeiroCor); //Cor do nevoeiro
-    glFogi(GL_FOG_MODE, GL_LINEAR); //Equação do nevoeiro - linear
-    //Outras opcoes: GL_EXP, GL_EXP2
-    glFogf(GL_FOG_START, 200.0); // Distância a que terá início o nevoeiro
-    glFogf(GL_FOG_END, 1.0); // Distância a que o nevoeiro terminará
-    //glFogf (GL_FOG_DENSITY, 0.35); //Densidade do nevoeiro - não se especifica quando temos "nevoeiro linear"
-    
-    
-}
 void init() {
 	//glClearColor(0, 0.75, 1, 1);
-    
-    /* enable ao nevoeiro */
-    glEnable(GL_FOG);
-    
-    glEnable(GL_COLOR_MATERIAL);
-    glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE );
-    
-    /* enable ao culling*/
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_FRONT);
-    initNevoeiro();
 	setNoise(mapa32);
-    
-    glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
-    glEnable(GL_LIGHT1);
-    glEnable(GL_DEPTH_TEST);
-    
-    loop();
-    
+	loop();
+	/*std::ofstream myfile;
+	myfile.open("map256.map");
+	for (int i = 0; i < 256; i++) {
+		for (int j = 0; j < 256; j++) {
+			myfile << " " << mapa256[i * 256 + j];
+		}
+		myfile << "\n";
+	}
+	myfile.close();*/
+	if (mapa256[0] < mapMinHeight)
+		mapa256[0] = mapMinHeight;
+	float min = mapa256[0], max = mapa256[0];
+	for (int i = 0; i < 256; i++) 
+		for (int j = 0; j < 256; j++) {
+			if (mapa256[i * 256 + j] < mapMinHeight) {
+				mapa256[i * 256 + j] = mapMinHeight;
+				colorMap256[i * 256 + j][0] = 0;
+				colorMap256[i * 256 + j][1] = rand() % 5;
+				colorMap256[i * 256 + j][2] = rand() % 75 + 25;
+			}else {
+				colorMap256[i * 256 + j][0] = mapa256[i * 256 + j];
+				colorMap256[i * 256 + j][1] = mapa256[i * 256 + j];
+				colorMap256[i * 256 + j][2] = mapa256[i * 256 + j];
+			}
+			if (mapa256[i * 256 + j] < min)
+				min = mapa256[i * 256 + j];
+			if (mapa256[i * 256 + j] > max)
+				max = mapa256[i * 256 + j];
+		}
+	
+	colorScale = abs(min - max);
+	//printf("min: %d - max: %d - diff: %d\n", (int)min, (int)max, (int)abs(min - max));
 }
 
 void desenhaReferencial() {
@@ -180,18 +188,57 @@ void desenhaObjecto() {
 	glutSolidTeapot(bule); 
 }
 
+void updateAndDisplayFPS() {
+	double currentTime = glutGet(GLUT_ELAPSED_TIME);
+	nbFrames++;
+	if (currentTime - lastTime >= 1000.0) {
+		printf("%.2f ms/frame\n", float(nbFrames*1000.0 / (currentTime - lastTime)));
+		nbFrames = 0;
+		lastTime = currentTime;
+		printf("%d, %d", rand() % 10, rand() % 75);
+	}
+}
+
+void handleMovement() {
+	if (wasd[0]) {
+		playerPosXZ[0] += sin(cameraAngleY * M_PI / 180) * 0.2;
+		playerPosXZ[1] += cos(cameraAngleY * M_PI / 180) * 0.2;
+	}
+	if (wasd[1]) {
+		playerPosXZ[0] += sin((cameraAngleY + 90) * M_PI / 180) * 0.2;
+		playerPosXZ[1] += cos((cameraAngleY + 90)* M_PI / 180) * 0.2;
+	}
+	if (wasd[2]) {
+		playerPosXZ[0] += sin((cameraAngleY - 180)* M_PI / 180) * 0.2;
+		playerPosXZ[1] += cos((cameraAngleY - 180)* M_PI / 180) * 0.2;
+	}
+	if (wasd[3]) {
+		playerPosXZ[0] += sin((cameraAngleY - 90)* M_PI / 180) * 0.2;
+		playerPosXZ[1] += cos((cameraAngleY - 90)* M_PI / 180) * 0.2;
+	}
+	//printf("%f, %f\n", playerPosXZ[0], playerPosXZ[1]);
+}
+
 void desenhaTerreno() {
 	for (int i = 0; i < 256 - 1; i++) {
+		//glEnable(GL_BLEND);
+		//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		glShadeModel(GL_SMOOTH);
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		glBegin(GL_TRIANGLE_STRIP);
 			for (int j = 0; j < 256; j++) {
-				float tmp = mapa256[i * 256 + j] / 100;
-				glColor3f(tmp, tmp, tmp);
+				float tmp = mapa256[i * 256 + j]/100;
+				if(mapa256[i * 256 + j] == mapMinHeight)
+					glColor3f(colorMap256[i * 256 + j][0], colorMap256[i * 256 + j][1], colorMap256[i * 256 + j][2]);
+				else	
+					glColor3f(tmp, tmp, tmp);
 				glVertex3f((i - 128) * 4.0, (mapa256[i * 256 + j] / 256.0) * 70, (j - 128) * 4.0);
-				tmp = mapa256[(i + 1) * 256 + j] / 100;
-				glColor3f(tmp, tmp, tmp);
+				tmp = mapa256[(i + 1) * 256 + j]/100;
+				if (mapa256[i * 256 + j] == mapMinHeight)
+					glColor3f(colorMap256[i * 256 + j][0], colorMap256[i * 256 + j][1], colorMap256[i * 256 + j][2]);
+				else
+					glColor3f(tmp, tmp, tmp);
 				glVertex3f((i - 127) * 4.0, (mapa256[(i + 1) * 256 + j] / 256.0) * 70, (j - 128) * 4.0);
 			}
 		glEnd();
@@ -222,18 +269,17 @@ float billbilinearInterpolation(float x, float z) {
 void desenha() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	handleMovement();
+
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	gluPerspective(65.0, (GLdouble)windowWidth / windowHeight, 1.0, 200.0);
+	gluPerspective(65.0, (GLdouble)windowWidth / windowHeight, 1.0, 300.0);
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	/*gluLookAt(playerPosXY[0], (billbilinearInterpolation(playerPosXY[0], playerPosXY[1]) / 256.0) * 70 + 2, playerPosXY[1], playerPosXY[0] + mouseScreenPosXYZ[0], (billbilinearInterpolation(playerPosXY[0], playerPosXY[1]) / 256.0) * 70 + 2 + mouseScreenPosXYZ[1], playerPosXY[1] + mouseScreenPosXYZ[2], 0.0, 1.0, 0.0);
-     */
-    gluLookAt(playerPosXY[0], (billbilinearInterpolation(playerPosXY[0], playerPosXY[1]) / 256.0) * 70 + 2, playerPosXY[1], playerPosXY[0] + mouseScreenPosXYZ[0], (billbilinearInterpolation(playerPosXY[0], playerPosXY[1]) / 256.0) * 70 + 2 + mouseScreenPosXYZ[1], playerPosXY[1] + mouseScreenPosXYZ[2], 0.0, 1.0, 0.0);
-    
-    
+	gluLookAt(playerPosXZ[0], (billbilinearInterpolation(playerPosXZ[0], playerPosXZ[1]) / 256.0) * 70 + 2, playerPosXZ[1], playerPosXZ[0] + mousePosXYZ[0], (billbilinearInterpolation(playerPosXZ[0], playerPosXZ[1]) / 256.0) * 70 + 2 + mousePosXYZ[1], playerPosXZ[1] + mousePosXYZ[2], 0.0, 1.0, 0.0);
+
 	/*desenhaReferencial();
 	glPushMatrix();
 		glRotatef(23, 0, 1, 0);
@@ -242,7 +288,8 @@ void desenha() {
 	glPopMatrix();*/
 
 	desenhaTerreno();
-
+	
+	updateAndDisplayFPS();
 	glutSwapBuffers();
 }
 
@@ -254,31 +301,67 @@ void timer(int value) {
 void teclasNotAscii(int key, int x, int y)
 {
 	if (key == GLUT_KEY_LEFT) {
-		playerPosXY[0]++;
+		playerPosXZ[0]--;
 		glutPostRedisplay();
 	}
 	if (key == GLUT_KEY_RIGHT) {
-		playerPosXY[0]--;
+		playerPosXZ[0]++;
 		glutPostRedisplay();
 	}
 	if (key == GLUT_KEY_DOWN) {
-		playerPosXY[1]--;
+		playerPosXZ[1]--;
 		glutPostRedisplay();
 	}
 	if (key == GLUT_KEY_UP) {
-		playerPosXY[1]++;
+		playerPosXZ[1]++;
 		glutPostRedisplay();
 	}
 }
 
 void teclado(unsigned char key, int x, int y) {
 	switch (key) {
-		case 27:
+		case 27:	// ESC
 			exit(0);
+			break;
+		case 119:	// W
+			wasd[0] = 1;
+			break;
+		case 97:	// A
+			wasd[1] = 1;
+			break;
+		case 115:	// S
+			wasd[2] = 1;
+			break;
+		case 100:	// D
+			wasd[3] = 1;
 			break;
 		default:
 			break;
 	}
+	glutPostRedisplay();
+}
+
+void tecladoUp(unsigned char key, int x, int y) {
+	switch (key) {
+	case 27:	// ESC
+		exit(0);
+		break;
+	case 119:	// W
+		wasd[0] = 0;
+		break;
+	case 97:	// A
+		wasd[1] = 0;
+		break;
+	case 115:	// S
+		wasd[2] = 0;
+		break;
+	case 100:	// D
+		wasd[3] = 0;
+		break;
+	default:
+		break;
+	}
+	glutPostRedisplay();
 }
 
 void onMouse(int button, int state, int x, int y) {
@@ -300,17 +383,17 @@ void onMotion(int x, int y) {
 			cameraAngleX = 90;
 		if (cameraAngleX < -90)
 			cameraAngleX = -90;
-		mouseScreenPosXYZ[0] = sin(cameraAngleY * M_PI / 180);
-		mouseScreenPosXYZ[2] = cos(cameraAngleY * M_PI / 180);
-		mouseScreenPosXYZ[1] = sin(cameraAngleX * M_PI / 180);
-		mouseScreenPosXYZ[0] *= cos(cameraAngleX * M_PI / 180);
-		mouseScreenPosXYZ[2] *= cos(cameraAngleX * M_PI / 180);
+		mousePosXYZ[0] = sin(cameraAngleY * M_PI / 180);
+		mousePosXYZ[2] = cos(cameraAngleY * M_PI / 180);
+		mousePosXYZ[1] = sin(cameraAngleX * M_PI / 180);
+		mousePosXYZ[0] *= cos(cameraAngleX * M_PI / 180);
+		mousePosXYZ[2] *= cos(cameraAngleX * M_PI / 180);
 		
 		mouseScreenPosXY[0] = x;
 		mouseScreenPosXY[1] = y;
 		
-		printf("x: %f z: %f y: %f\n", mouseScreenPosXYZ[0], mouseScreenPosXYZ[2], mouseScreenPosXYZ[1]);
-		glutPostRedisplay();
+		//printf("x: %f z: %f y: %f\n", mouseScreenPosXYZ[0], mouseScreenPosXYZ[2], mouseScreenPosXYZ[1]);
+		//glutPostRedisplay();
 
 		glutWarpPointer(windowWidth/2,windowHeight/2);
 		//SetCursorPos(windowWidth / 2, windowHeight / 2);
@@ -322,13 +405,14 @@ int main(int argc, char** argv) {
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
 	glutInitWindowSize(windowWidth, windowHeight);
 	glutInitWindowPosition(600, 50);
-	glutCreateWindow("{pjmm,jpa}@dei.uc.pt-CG ::::::::::::::: Clouds (Perlin Noise) ");
-	glutFullScreen();
+	glutCreateWindow("jpcorr@student.dei.uc.pt ::::::::::::::: Terrain (Perlin Noise) ");
+	//glutFullScreen();
 	init();
 	glViewport(0, 0, (GLsizei)windowWidth, (GLsizei)windowHeight);
 
 	glutDisplayFunc(desenha);
 	glutKeyboardFunc(teclado);
+	glutKeyboardUpFunc(tecladoUp);
 	glutMouseFunc(onMouse);
 	glutPassiveMotionFunc(onMotion);
 	glutSpecialFunc(teclasNotAscii);
@@ -338,6 +422,9 @@ int main(int argc, char** argv) {
 	
 	windowWidth = glutGet(GLUT_WINDOW_WIDTH);
 	windowHeight = glutGet(GLUT_WINDOW_HEIGHT);
+	glutWarpPointer(windowWidth / 2, windowHeight / 2);
+	mouseScreenPosXY[0] = windowWidth / 2;
+	mouseScreenPosXY[1] = windowHeight / 2;
 	glutMainLoop();
 	
 	
