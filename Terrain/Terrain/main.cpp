@@ -19,6 +19,7 @@
 #define BLUE	0.0, 0.0, 100.0,		100.0
 #define ORANGE	100.0, 65.0, 0.0,		100.0
 
+#define RADPERDEG 0.0174533
 float mapa32[32 * 32];
 float mapa256[256 * 256];
 float colorMap256[256 * 256][3];
@@ -37,7 +38,7 @@ GLfloat wasd[4] = {0, 0, 0, 0};
 GLfloat velocidadeY = 0;
 GLfloat saltoY = 0;
 /* DEFINIÇÃO DA COR DO NEVOEIRO */
-GLfloat nevoeiroCor[] = {0.75, 0.75, 0.75, 1.0};
+GLfloat nevoeiroCor[] = {0.1, 0.0, 0.0, 1.0};
 
 double lastTime = 0;
 int nbFrames = 0;
@@ -151,7 +152,7 @@ void init() {
     glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE );
     
     
-    /*ACTIVAR FRONT CULLING*/
+    /*ACTIVAR FRONT FACE CULLING*/
     glEnable(GL_CULL_FACE);
     glCullFace(GL_FRONT);
     
@@ -274,6 +275,68 @@ void desenhaTerreno() {
 	}
 }
 
+/* TODO: SETA*/
+/* onde começa e acaba a arrow e a sua espessura*/
+ void Arrow(GLdouble x1,GLdouble y1,GLdouble z1,GLdouble x2,GLdouble y2,GLdouble z2,GLdouble D){
+     double x=x2-x1;
+     double y=y2-y1;
+     double z=z2-z1;
+     double L=sqrt(x*x+y*y+z*z);
+ 
+     GLUquadricObj *quadObj;
+ 
+     glPushMatrix ();
+ 
+        glTranslated(x1,y1,z1);
+ 
+        if((x!=0.)||(y!=0.)) {
+ 		glRotated(atan2(y,x)/RADPERDEG,0.,0.,1.);
+            glRotated(atan2(sqrt(x*x+y*y),z)/RADPERDEG,0.,1.,0.);
+        } else if (z<0){
+            glRotated(180,1.,0.,0.);
+        }
+     
+         glTranslatef(0,0,L-4*D);
+         
+         quadObj = gluNewQuadric ();
+         gluQuadricDrawStyle (quadObj, GLU_FILL);
+         gluQuadricNormals (quadObj, GLU_SMOOTH);
+         gluCylinder(quadObj, 2*D, 0.0, 4*D, 32, 1);
+         gluDeleteQuadric(quadObj);
+         
+         quadObj = gluNewQuadric ();
+         gluQuadricDrawStyle (quadObj, GLU_FILL);
+         gluQuadricNormals (quadObj, GLU_SMOOTH);
+         gluDisk(quadObj, 0.0, 2*D, 32, 1);
+         gluDeleteQuadric(quadObj);
+         
+         glTranslatef(0,0,-L+4*D);
+         
+         quadObj = gluNewQuadric ();
+         gluQuadricDrawStyle (quadObj, GLU_FILL);
+         gluQuadricNormals (quadObj, GLU_SMOOTH);
+         gluCylinder(quadObj, D, D, L-4*D, 32, 1);
+         gluDeleteQuadric(quadObj);
+         
+         quadObj = gluNewQuadric ();
+         gluQuadricDrawStyle (quadObj, GLU_FILL);
+         gluQuadricNormals (quadObj, GLU_SMOOTH);
+         gluDisk(quadObj, 0.0, D, 32, 1);
+         gluDeleteQuadric(quadObj);
+         
+     glPopMatrix ();
+ 
+ }
+
+ void desenhaSeta(GLdouble length){
+     glPushMatrix();
+        glTranslatef(0,0,-length);
+        Arrow(0,0,0, 0,0,2*length, 0.2);
+     glPopMatrix();
+ }
+ 
+ 
+
 float billbilinearInterpolation(float x, float z) {
 	x = x / 4 + 128;
 	z = z / 4 + 128;
@@ -325,7 +388,7 @@ void desenha() {
 	glPopMatrix();*/
 
 	desenhaTerreno();
-	
+    desenhaSeta(5);
 	updateAndDisplayFPS();
 	glutSwapBuffers();
 }
