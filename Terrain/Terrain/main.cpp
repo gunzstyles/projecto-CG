@@ -317,6 +317,30 @@ void desenhaSeta(GLdouble length) {
 }
 
 
+void drawCrosshair(){
+    glPushMatrix();
+    glViewport(0, 0, windowWidth, windowHeight);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, windowWidth, windowHeight, 0, -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    
+    glColor3ub(240, 240, 240);//white
+    glLineWidth(2.0);
+    glBegin(GL_LINES);
+    //horizontal line
+    glVertex2i(windowWidth / 2 - 7, windowHeight / 2);
+    glVertex2i(windowWidth / 2 + 7, windowHeight / 2);
+    glEnd();
+    //vertical line
+    glBegin(GL_LINES);
+    glVertex2i(windowWidth / 2, windowHeight / 2 + 7);
+    glVertex2i(windowWidth / 2, windowHeight / 2 - 7);
+    glEnd();
+    
+    glPopMatrix();
+}
 
 float billbilinearInterpolation(float x, float z) {
 	x = x / 4 + 128;
@@ -368,10 +392,12 @@ void desenha() {
 	glScalef(1, 1.4, 2);
 	desenhaObjecto();
 	glPopMatrix();*/
-
+    
+    
 	desenhaTerreno();
 	desenhaSeta(5);
-	GLfloat Hnear = 2 * tan(fov / 2) * nearDist;
+	drawCrosshair();
+    GLfloat Hnear = 2 * tan(fov / 2) * nearDist;
 	GLfloat Wnear = Hnear * ratio;
 	GLfloat Hfar = 2 * tan(fov / 2) * farDist;
 	GLfloat	Wfar = Hfar * ratio;
@@ -500,7 +526,7 @@ int main(int argc, char** argv) {
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
 	glutInitWindowSize(windowWidth, windowHeight);
 	glutInitWindowPosition(600, 50);
-	glutCreateWindow("jpcorr@student.dei.uc.pt ::::::::::::::: Terrain (Perlin Noise) ");
+	glutCreateWindow("JOGO DO JOEL E DO JOAO! ");
 	//glutFullScreen();
 	init();
 	glViewport(0, 0, (GLsizei)windowWidth, (GLsizei)windowHeight);
