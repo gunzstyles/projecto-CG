@@ -27,18 +27,20 @@ int mapMinHeight = 20;
 int windowWidth = 800, windowHeight = 600;
 float check, colorScale;
 
-GLfloat playerPosXZ[2] = {0, 0};
-GLfloat mouseScreenPosXY[2] = {0, 0};
-GLfloat mousePosXYZ[3] = {1, 0, 0};
+GLfloat fov = 65.0, ratio = (GLdouble)windowWidth / windowHeight, nearDist = 1.0, farDist = 300.0;
+
+GLfloat playerPosXZ[2] = { 0, 0 };
+GLfloat mouseScreenPosXY[2] = { 0, 0 };
+GLfloat mousePosXYZ[3] = { 1, 0, 0 };
 GLfloat cameraAngleY = 90.0;
 GLfloat cameraAngleX = 0;
-GLfloat wasd[4] = {0, 0, 0, 0};
+GLfloat wasd[4] = { 0, 0, 0, 0 };
 
 /* teste para saltar*/
 GLfloat velocidadeY = 0;
 GLfloat saltoY = 0;
 /* DEFINIÇÃO DA COR DO NEVOEIRO */
-GLfloat nevoeiroCor[] = {0.1, 0.0, 0.0, 1.0};
+GLfloat nevoeiroCor[] = { 0.0, 0.0, 0.0, 1.0 };
 
 double lastTime = 0;
 int nbFrames = 0;
@@ -53,6 +55,7 @@ float noise(int x, int y, int aleatorio) {
 void setNoise(float  *mapa) {
 	time_t t;
 	float temp[34][34];
+	srand(time(NULL));
 	int aleatorio = rand() % 5000;
 
 	srand((unsigned)time(&t));
@@ -131,90 +134,65 @@ void loop() {
 	expFilter(mapa256);
 }
 
-void initNevoeiro(void){
-    glFogfv(GL_FOG_COLOR, nevoeiroCor); //Cor do nevoeiro
-    glFogi(GL_FOG_MODE, GL_LINEAR); //Equação do nevoeiro - linear
-    //Outras opcoes: GL_EXP, GL_EXP2
-    glFogf(GL_FOG_START, 1.0); // Distância a que terá início o nevoeiro
-    glFogf(GL_FOG_END, 200.0); // Distância a que o nevoeiro terminará
-    //glFogf (GL_FOG_DENSITY, 0.35); //Densidade do nevoeiro - não se especifica quando temos "nevoeiro linear"
+void initNevoeiro(void) {
+	glFogfv(GL_FOG_COLOR, nevoeiroCor); //Cor do nevoeiro
+	glFogi(GL_FOG_MODE, GL_EXP2); //Equação do nevoeiro - linear
+									//Outras opcoes: GL_EXP, GL_EXP2
+	glFogf(GL_FOG_START, 1.0); // Distância a que terá início o nevoeiro
+	glFogf(GL_FOG_END, 200.0); // Distância a que o nevoeiro terminará
+	glFogf(GL_FOG_DENSITY, 0.01);//glFogf (GL_FOG_DENSITY, 0.35); //Densidade do nevoeiro - não se especifica quando temos "nevoeiro linear"
 }
 
 void init() {
 	//glClearColor(0, 0.75, 1, 1);
 	setNoise(mapa32);
-    
-    /* ACTIVAR NEVOEIRO */
-    glEnable(GL_FOG);
-    initNevoeiro();
-  
-    glEnable(GL_COLOR_MATERIAL);
-    glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE );
-    
-    
-    /*ACTIVAR FRONT FACE CULLING*/
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_FRONT);
-    
+
+	/* ACTIVAR NEVOEIRO */
+	glEnable(GL_FOG);
+	initNevoeiro();
+
+	glEnable(GL_COLOR_MATERIAL);
+	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+
+
+	/*ACTIVAR FRONT FACE CULLING*/
+	glEnable(GL_CULL_FACE);
+	glFrontFace(GL_CW);
+	// ENABLE DEPTH TEST
+	glEnable(GL_DEPTH_TEST);
+	glDepthMask(GL_TRUE);
+	
+
 	loop();
-	/*std::ofstream myfile;
-	myfile.open("map256.map");
-	for (int i = 0; i < 256; i++) {
-		for (int j = 0; j < 256; j++) {
-			myfile << " " << mapa256[i * 256 + j];
-		}
-		myfile << "\n";
-	}
-	myfile.close();*/
-	if (mapa256[0] < mapMinHeight)
-		mapa256[0] = mapMinHeight;
+	/*if (mapa256[0] < mapMinHeight)
+		mapa256[0] = mapMinHeight;*/
 	float min = mapa256[0], max = mapa256[0];
-	for (int i = 0; i < 256; i++) 
+	for (int i = 0; i < 256; i++)
 		for (int j = 0; j < 256; j++) {
-			if (mapa256[i * 256 + j] < mapMinHeight) {
-				mapa256[i * 256 + j] = mapMinHeight;
-				colorMap256[i * 256 + j][0] = 0;
-				colorMap256[i * 256 + j][1] = rand() % 5;
-				colorMap256[i * 256 + j][2] = rand() % 75 + 25;
-			}else {
-				colorMap256[i * 256 + j][0] = mapa256[i * 256 + j];
-				colorMap256[i * 256 + j][1] = mapa256[i * 256 + j];
-				colorMap256[i * 256 + j][2] = mapa256[i * 256 + j];
-			}
 			if (mapa256[i * 256 + j] < min)
 				min = mapa256[i * 256 + j];
 			if (mapa256[i * 256 + j] > max)
 				max = mapa256[i * 256 + j];
 		}
-	
+	srand(time(NULL));
+	for (int i = 0; i < 256; i++)
+		for (int j = 0; j < 256; j++) {
+			if (mapa256[i * 256 + j] < mapMinHeight) {
+				mapa256[i * 256 + j] = mapMinHeight + ((rand() % 6) - 3);
+				colorMap256[i * 256 + j][0] = 0;
+				colorMap256[i * 256 + j][1] = rand() % 5;
+				colorMap256[i * 256 + j][2] = rand() % 25 + 10
+					;
+			}
+			else {
+				colorMap256[i * 256 + j][0] = mapa256[i * 256 + j];
+				colorMap256[i * 256 + j][1] = mapa256[i * 256 + j];
+				colorMap256[i * 256 + j][2] = mapa256[i * 256 + j];
+			}
+		}
+
 	colorScale = abs(min - max);
-	//printf("min: %d - max: %d - diff: %d\n", (int)min, (int)max, (int)abs(min - max));
-}
-
-void desenhaReferencial() {
-	glColor4f(RED);
-	glBegin(GL_LINES);
-		glVertex3f(-512.0, 0.0, 0.0);
-		glVertex3f(512.0, 0.0, 0.0);
-	glEnd();
-	glColor4f(GREEN);
-	glBegin(GL_LINES);
-		glVertex3f(0.0, -512.0, 0.0);
-		glVertex3f(0.0, 512.0, 0.0);
-	glEnd();
-	glColor4f(BLUE);
-	glBegin(GL_LINES);
-		glVertex3f(0.0, 0.0, -512.0);
-		glVertex3f(0.0, 0.0, 512.0);
-	glEnd();
-}
-
-void desenhaObjecto() {
-	GLfloat   bule = 1;
-	GLfloat   buleP[] = { 0, 0, 0 };
-	glTranslatef(buleP[0], buleP[1], buleP[2]);
-	glColor4f(ORANGE);//Definir previamente o LARANJA (#define LARANJA Ö)
-	glutSolidTeapot(bule); 
+	printf("min: %d - max: %d - diff: %d\n", (int)min, (int)max, (int)abs(min - max));
 }
 
 void updateAndDisplayFPS() {
@@ -224,7 +202,6 @@ void updateAndDisplayFPS() {
 		printf("%.2f ms/frame\n", float(nbFrames*1000.0 / (currentTime - lastTime)));
 		nbFrames = 0;
 		lastTime = currentTime;
-		printf("%d, %d", rand() % 10, rand() % 75);
 	}
 }
 
@@ -249,101 +226,105 @@ void handleMovement() {
 }
 
 void desenhaTerreno() {
-	for (int i = 0; i < 256 - 1; i++) {
-		//glEnable(GL_BLEND);
-		//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glShadeModel(GL_SMOOTH);
-		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	glShadeModel(GL_SMOOTH);
+	glEnable(GL_POLYGON_OFFSET_FILL); // Avoid Stitching!
+	glPolygonOffset(1.0, 1.0);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	for (int i = 0; i < 256; i++) {
 		glBegin(GL_TRIANGLE_STRIP);
-			for (int j = 0; j < 256; j++) {
-				float tmp = mapa256[i * 256 + j]/100;
-				if(mapa256[i * 256 + j] == mapMinHeight)
-					glColor3f(colorMap256[i * 256 + j][0], colorMap256[i * 256 + j][1], colorMap256[i * 256 + j][2]);
-				else	
-					glColor3f(tmp, tmp, tmp);
-				glVertex3f((i - 128) * 4.0, (mapa256[i * 256 + j] / 256.0) * 70, (j - 128) * 4.0);
-				tmp = mapa256[(i + 1) * 256 + j]/100;
-				if (mapa256[i * 256 + j] == mapMinHeight)
-					glColor3f(colorMap256[i * 256 + j][0], colorMap256[i * 256 + j][1], colorMap256[i * 256 + j][2]);
-				else
-					glColor3f(tmp, tmp, tmp);
-				glVertex3f((i - 127) * 4.0, (mapa256[(i + 1) * 256 + j] / 256.0) * 70, (j - 128) * 4.0);
-			}
+		for (int j = 0; j < 256 - 1; j++) {
+			glColor3f(0.0, 0.0, 0.0);
+			glVertex3f((i - 128) * 4.0, (mapa256[i * 256 + j] / 256.0) * 70, (j - 128) * 4.0);
+			glColor3f(0.0, 0.0, 0.0);
+			glVertex3f((i - 127) * 4.0, (mapa256[(i + 1) * 256 + j] / 256.0) * 70, (j - 128) * 4.0);
+		}
 		glEnd();
-		glShadeModel(GL_FLAT);
 	}
+	glDisable(GL_POLYGON_OFFSET_FILL);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	for (int i = 0; i < 256; i++) {
+		glBegin(GL_TRIANGLE_STRIP);
+		for (int j = 0; j < 256 - 1; j++) {
+			glColor3f(colorMap256[i * 256 + j][0], colorMap256[i * 256 + j][1], colorMap256[i * 256 + j][2]);
+			glVertex3f((i - 128) * 4.0, (mapa256[i * 256 + j] / 256.0) * 70, (j - 128) * 4.0);
+			glColor3f(colorMap256[i * 256 + j][0], colorMap256[(i + 1) * 256 + j][1], colorMap256[i * 256 + j][2]);
+			glVertex3f((i - 127) * 4.0, (mapa256[(i + 1) * 256 + j] / 256.0) * 70, (j - 128) * 4.0);
+		}
+		glEnd();
+	}
+	glShadeModel(GL_FLAT);
 }
 
 /* TODO: SETA*/
 /* onde começa e acaba a arrow e a sua espessura*/
- void Arrow(GLdouble x1,GLdouble y1,GLdouble z1,GLdouble x2,GLdouble y2,GLdouble z2,GLdouble D){
-     double x=x2-x1;
-     double y=y2-y1;
-     double z=z2-z1;
-     double L=sqrt(x*x+y*y+z*z);
- 
-     GLUquadricObj *quadObj;
- 
-     glPushMatrix ();
- 
-        glTranslated(x1,y1,z1);
- 
-        if((x!=0.)||(y!=0.)) {
- 		glRotated(atan2(y,x)/RADPERDEG,0.,0.,1.);
-            glRotated(atan2(sqrt(x*x+y*y),z)/RADPERDEG,0.,1.,0.);
-        } else if (z<0){
-            glRotated(180,1.,0.,0.);
-        }
-     
-         glTranslatef(0,0,L-4*D);
-         
-         quadObj = gluNewQuadric ();
-         gluQuadricDrawStyle (quadObj, GLU_FILL);
-         gluQuadricNormals (quadObj, GLU_SMOOTH);
-         gluCylinder(quadObj, 2*D, 0.0, 4*D, 32, 1);
-         gluDeleteQuadric(quadObj);
-         
-         quadObj = gluNewQuadric ();
-         gluQuadricDrawStyle (quadObj, GLU_FILL);
-         gluQuadricNormals (quadObj, GLU_SMOOTH);
-         gluDisk(quadObj, 0.0, 2*D, 32, 1);
-         gluDeleteQuadric(quadObj);
-         
-         glTranslatef(0,0,-L+4*D);
-         
-         quadObj = gluNewQuadric ();
-         gluQuadricDrawStyle (quadObj, GLU_FILL);
-         gluQuadricNormals (quadObj, GLU_SMOOTH);
-         gluCylinder(quadObj, D, D, L-4*D, 32, 1);
-         gluDeleteQuadric(quadObj);
-         
-         quadObj = gluNewQuadric ();
-         gluQuadricDrawStyle (quadObj, GLU_FILL);
-         gluQuadricNormals (quadObj, GLU_SMOOTH);
-         gluDisk(quadObj, 0.0, D, 32, 1);
-         gluDeleteQuadric(quadObj);
-         
-     glPopMatrix ();
- 
- }
+void Arrow(GLdouble x1, GLdouble y1, GLdouble z1, GLdouble x2, GLdouble y2, GLdouble z2, GLdouble D) {
+	double x = x2 - x1;
+	double y = y2 - y1;
+	double z = z2 - z1;
+	double L = sqrt(x*x + y*y + z*z);
 
- void desenhaSeta(GLdouble length){
-     glPushMatrix();
-        glTranslatef(0,0,-length);
-        Arrow(0,0,0, 0,0,2*length, 0.2);
-     glPopMatrix();
- }
- 
- 
+	GLUquadricObj *quadObj;
+
+	glPushMatrix();
+
+	glTranslated(x1, y1, z1);
+
+	if ((x != 0.) || (y != 0.)) {
+		glRotated(atan2(y, x) / RADPERDEG, 0., 0., 1.);
+		glRotated(atan2(sqrt(x*x + y*y), z) / RADPERDEG, 0., 1., 0.);
+	}
+	else if (z<0) {
+		glRotated(180, 1., 0., 0.);
+	}
+
+	glTranslatef(0, 0, L - 4 * D);
+
+	quadObj = gluNewQuadric();
+	gluQuadricDrawStyle(quadObj, GLU_FILL);
+	gluQuadricNormals(quadObj, GLU_SMOOTH);
+	gluCylinder(quadObj, 2 * D, 0.0, 4 * D, 32, 1);
+	gluDeleteQuadric(quadObj);
+
+	quadObj = gluNewQuadric();
+	gluQuadricDrawStyle(quadObj, GLU_FILL);
+	gluQuadricNormals(quadObj, GLU_SMOOTH);
+	gluDisk(quadObj, 0.0, 2 * D, 32, 1);
+	gluDeleteQuadric(quadObj);
+
+	glTranslatef(0, 0, -L + 4 * D);
+
+	quadObj = gluNewQuadric();
+	gluQuadricDrawStyle(quadObj, GLU_FILL);
+	gluQuadricNormals(quadObj, GLU_SMOOTH);
+	gluCylinder(quadObj, D, D, L - 4 * D, 32, 1);
+	gluDeleteQuadric(quadObj);
+
+	quadObj = gluNewQuadric();
+	gluQuadricDrawStyle(quadObj, GLU_FILL);
+	gluQuadricNormals(quadObj, GLU_SMOOTH);
+	gluDisk(quadObj, 0.0, D, 32, 1);
+	gluDeleteQuadric(quadObj);
+
+	glPopMatrix();
+
+}
+
+void desenhaSeta(GLdouble length) {
+	glPushMatrix();
+	glTranslatef(0, 0, -length);
+	Arrow(0, 0, 0, 0, 0, 2 * length, 0.2);
+	glPopMatrix();
+}
+
+
 
 float billbilinearInterpolation(float x, float z) {
 	x = x / 4 + 128;
 	z = z / 4 + 128;
-	int x1 = (int) x;
-	int x2 = (int) x + 1;
-	int y1 = (int) z;
-	int y2 = (int) z + 1;
+	int x1 = (int)x;
+	int x2 = (int)x + 1;
+	int y1 = (int)z;
+	int y2 = (int)z + 1;
 
 	float q11 = mapa256[x1 * 256 + y1];
 	float q12 = mapa256[x1 * 256 + y2];
@@ -359,36 +340,42 @@ float billbilinearInterpolation(float x, float z) {
 
 void desenha() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+	
 	handleMovement();
+	//glEnable(GL_DEPTH_TEST);
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	gluPerspective(65.0, (GLdouble)windowWidth / windowHeight, 1.0, 300.0);
+	gluPerspective(fov, ratio, nearDist, farDist);
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-    GLfloat tmpPosY = (billbilinearInterpolation(playerPosXZ[0], playerPosXZ[1]) / 256.0) * 70 + 2;
-    saltoY += velocidadeY;
-    tmpPosY += saltoY;
-    
-    velocidadeY -= 0.06;
-    if((billbilinearInterpolation(playerPosXZ[0], playerPosXZ[1]) / 256.0) * 70 + 2 > tmpPosY){
-        tmpPosY = (billbilinearInterpolation(playerPosXZ[0], playerPosXZ[1]) / 256.0) * 70 + 2;
-        velocidadeY = 0;
-    }
+	GLfloat tmpPosY = (billbilinearInterpolation(playerPosXZ[0], playerPosXZ[1]) / 256.0) * 70 + 2;
+	saltoY += velocidadeY;
+	tmpPosY += saltoY;
+
+	velocidadeY -= 0.06;
+	if ((billbilinearInterpolation(playerPosXZ[0], playerPosXZ[1]) / 256.0) * 70 + 2 > tmpPosY) {
+		tmpPosY = (billbilinearInterpolation(playerPosXZ[0], playerPosXZ[1]) / 256.0) * 70 + 2;
+		velocidadeY = 0;
+	}
 
 	gluLookAt(playerPosXZ[0], tmpPosY, playerPosXZ[1], playerPosXZ[0] + mousePosXYZ[0], tmpPosY + mousePosXYZ[1], playerPosXZ[1] + mousePosXYZ[2], 0.0, 1.0, 0.0);
 
 	/*desenhaReferencial();
 	glPushMatrix();
-		glRotatef(23, 0, 1, 0);
-		glScalef(1, 1.4, 2);
-		desenhaObjecto();
+	glRotatef(23, 0, 1, 0);
+	glScalef(1, 1.4, 2);
+	desenhaObjecto();
 	glPopMatrix();*/
 
 	desenhaTerreno();
-    desenhaSeta(5);
+	desenhaSeta(5);
+	GLfloat Hnear = 2 * tan(fov / 2) * nearDist;
+	GLfloat Wnear = Hnear * ratio;
+	GLfloat Hfar = 2 * tan(fov / 2) * farDist;
+	GLfloat	Wfar = Hfar * ratio;
+	//glFrustum(-Wfar / 2, Wfar / 2, -Hfar / 2, Hfar / 2, nearDist, farDist);
 	updateAndDisplayFPS();
 	glutSwapBuffers();
 }
@@ -400,53 +387,53 @@ void timer(int value) {
 
 void teclasNotAscii(int key, int x, int y)
 {
-    /*
+	/*
 	if (key == GLUT_KEY_LEFT) {
-		playerPosXZ[0]--;
-		glutPostRedisplay();
+	playerPosXZ[0]--;
+	glutPostRedisplay();
 	}
 	if (key == GLUT_KEY_RIGHT) {
-		playerPosXZ[0]++;
-		glutPostRedisplay();
+	playerPosXZ[0]++;
+	glutPostRedisplay();
 	}
 	if (key == GLUT_KEY_DOWN) {
-		playerPosXZ[1]--;
-		glutPostRedisplay();
+	playerPosXZ[1]--;
+	glutPostRedisplay();
 	}
 	if (key == GLUT_KEY_UP) {
-		playerPosXZ[1]++;
-		glutPostRedisplay();
+	playerPosXZ[1]++;
+	glutPostRedisplay();
 	}
-     */
+	*/
 }
 
 void teclado(unsigned char key, int x, int y) {
 	switch (key) {
-		case 27:	// ESC
-			exit(0);
-			break;
-		case 119:	// W
-			wasd[0] = 1;
-			break;
-		case 97:	// A
-			wasd[1] = 1;
-			break;
-		case 115:	// S
-			wasd[2] = 1;
-			break;
-		case 100:	// D
-			wasd[3] = 1;
-			break;
-        case 32: // ESPAÇO
-            if(saltoY < 0){
-                velocidadeY = 1;
-                saltoY = 0;
-            }
-            break;
-		default:
-			break;
+	case 27:	// ESC
+		exit(0);
+		break;
+	case 119:	// W
+		wasd[0] = 1;
+		break;
+	case 97:	// A
+		wasd[1] = 1;
+		break;
+	case 115:	// S
+		wasd[2] = 1;
+		break;
+	case 100:	// D
+		wasd[3] = 1;
+		break;
+	case 32: // ESPAÇO
+		if (saltoY < 0) {
+			velocidadeY = 1;
+			saltoY = 0;
+		}
+		break;
+	default:
+		break;
 	}
-	glutPostRedisplay();
+	//glutPostRedisplay();
 }
 
 void tecladoUp(unsigned char key, int x, int y) {
@@ -469,17 +456,17 @@ void tecladoUp(unsigned char key, int x, int y) {
 	default:
 		break;
 	}
-	glutPostRedisplay();
+	//glutPostRedisplay();
 }
 
 void onMouse(int button, int state, int x, int y) {
 	/*if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-		arcball_on = true;
-		last_mx = cur_mx = x;
-		last_my = cur_my = y;
+	arcball_on = true;
+	last_mx = cur_mx = x;
+	last_my = cur_my = y;
 	}
 	else {
-		arcball_on = false;
+	arcball_on = false;
 	}*/
 }
 
@@ -496,14 +483,14 @@ void onMotion(int x, int y) {
 		mousePosXYZ[1] = sin(cameraAngleX * M_PI / 180);
 		mousePosXYZ[0] *= cos(cameraAngleX * M_PI / 180);
 		mousePosXYZ[2] *= cos(cameraAngleX * M_PI / 180);
-		
+
 		mouseScreenPosXY[0] = x;
 		mouseScreenPosXY[1] = y;
-		
+
 		//printf("x: %f z: %f y: %f\n", mouseScreenPosXYZ[0], mouseScreenPosXYZ[2], mouseScreenPosXYZ[1]);
 		//glutPostRedisplay();
 
-		glutWarpPointer(windowWidth/2,windowHeight/2);
+		glutWarpPointer(windowWidth / 2, windowHeight / 2);
 		//SetCursorPos(windowWidth / 2, windowHeight / 2);
 	}
 }
@@ -527,14 +514,14 @@ int main(int argc, char** argv) {
 	glutTimerFunc(60, timer, 1);
 
 	glutSetCursor(GLUT_CURSOR_NONE);
-	
+
 	windowWidth = glutGet(GLUT_WINDOW_WIDTH);
 	windowHeight = glutGet(GLUT_WINDOW_HEIGHT);
 	glutWarpPointer(windowWidth / 2, windowHeight / 2);
 	mouseScreenPosXY[0] = windowWidth / 2;
 	mouseScreenPosXY[1] = windowHeight / 2;
 	glutMainLoop();
-	
-	
+
+
 	return 0;
 }
