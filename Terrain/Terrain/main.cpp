@@ -5,8 +5,6 @@
 #include <iostream>
 #include <fstream>
 
-#include"helper.h"
-
 #ifdef __APPLE__
 #include <OpenGL/OpenGL.h>
 #include <GLUT/glut.h>
@@ -29,7 +27,7 @@ int mapMinHeight = 20;
 int windowWidth = 800, windowHeight = 600;
 float check, colorScale;
 
-GLfloat fov = 65.0, ratio = (GLdouble)windowWidth / windowHeight, nearDist = 0.1, farDist = 300.0;
+GLfloat fov = 65.0, ratio = (GLdouble)windowWidth / windowHeight, nearDist = 1.0, farDist = 300.0;
 
 GLfloat playerPosXZ[2] = { 0, 0 };
 GLfloat mouseScreenPosXY[2] = { 0, 0 };
@@ -47,6 +45,9 @@ GLfloat nevoeiroCor[] = { 0.0, 0.0, 0.0, 1.0 };
 double lastTime = 0;
 int nbFrames = 0;
 
+/* HUD fps*/
+int frameCount;
+float currentTime,previousTime,fps;
 
 float noise(int x, int y, int aleatorio) {
 	int n = x + y * 57 + aleatorio * 131;
@@ -158,7 +159,6 @@ void init() {
 
 
 	/*ACTIVAR FRONT FACE CULLING*/
-
 	glEnable(GL_CULL_FACE);
 	glFrontFace(GL_CW);
 	// ENABLE DEPTH TEST
@@ -196,14 +196,14 @@ void init() {
 
 	colorScale = abs(min - max);
 	printf("min: %d - max: %d - diff: %d\n", (int)min, (int)max, (int)abs(min - max));
-
 }
 
 void updateAndDisplayFPS() {
 	double currentTime = glutGet(GLUT_ELAPSED_TIME);
 	nbFrames++;
 	if (currentTime - lastTime >= 1000.0) {
-		//printf("%.2f ms/frame .... %f\n", float(nbFrames*1000.0 / (currentTime - lastTime)), cameraAngleY);
+		printf("%.2f ms/frame\n", float(nbFrames*1000.0 / (currentTime - lastTime)));
+        fps =float(nbFrames*1000.0 / (currentTime - lastTime));
 		nbFrames = 0;
 		lastTime = currentTime;
 	}
@@ -230,14 +230,13 @@ void handleMovement() {
 }
 
 void desenhaTerreno() {
-	
 	glShadeModel(GL_SMOOTH);
 	glEnable(GL_POLYGON_OFFSET_FILL); // Avoid Stitching!
 	glPolygonOffset(1.0, 1.0);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	for (int i = 0; i < 256 - 1; i++) {
+	for (int i = 0; i < 256; i++) {
 		glBegin(GL_TRIANGLE_STRIP);
-		for (int j = 0; j < 256; j++) {
+		for (int j = 0; j < 256 - 1; j++) {
 			glColor3f(0.0, 0.0, 0.0);
 			glVertex3f((i - 128) * 4.0, (mapa256[i * 256 + j] / 256.0) * 70, (j - 128) * 4.0);
 			glColor3f(0.0, 0.0, 0.0);
@@ -247,9 +246,9 @@ void desenhaTerreno() {
 	}
 	glDisable(GL_POLYGON_OFFSET_FILL);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	for (int i = 0; i < 256 - 1; i++) {
+	for (int i = 0; i < 256; i++) {
 		glBegin(GL_TRIANGLE_STRIP);
-		for (int j = 0; j < 256; j++) {
+		for (int j = 0; j < 256 - 1; j++) {
 			glColor3f(colorMap256[i * 256 + j][0], colorMap256[i * 256 + j][1], colorMap256[i * 256 + j][2]);
 			glVertex3f((i - 128) * 4.0, (mapa256[i * 256 + j] / 256.0) * 70, (j - 128) * 4.0);
 			glColor3f(colorMap256[i * 256 + j][0], colorMap256[(i + 1) * 256 + j][1], colorMap256[i * 256 + j][2]);
@@ -257,9 +256,7 @@ void desenhaTerreno() {
 		}
 		glEnd();
 	}
-	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glShadeModel(GL_FLAT);
-	
 }
 
 /* TODO: SETA*/
@@ -323,7 +320,76 @@ void desenhaSeta(GLdouble length) {
 	glPopMatrix();
 }
 
+void drawCrosshair() {
+    glPushMatrix();
+    glViewport(0, 0, windowWidth, windowHeight);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, windowWidth, windowHeight, 0, -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    
+    
+    glColor3ub(0, 240, 100);//verde
+    glLineWidth(2.0);
+    glBegin(GL_LINES);
+    //horizontal line
+    glVertex2i(windowWidth / 2 - 7, windowHeight / 2);
+    glVertex2i(windowWidth / 2 + 7, windowHeight / 2);
+    glEnd();
+    //vertical line
+    glBegin(GL_LINES);
+    glVertex2i(windowWidth / 2, windowHeight / 2 + 7);
+    glVertex2i(windowWidth / 2, windowHeight / 2 - 7);
+    glEnd();
+    glLineWidth(1.0);
+    glPopMatrix();
+}
 
+
+void drawText(char *string, GLfloat x, GLfloat y, GLfloat z){
+    glRasterPos3f(x, y, z);
+    while (*string)
+        glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, *string++);
+}
+
+void showFps(){
+    char text[100] = "";
+    glColor3f(0,1,1);
+    sprintf(text, "FPS: %.1f", fps);
+    drawText(text, -7, -8.5f, 1);
+}
+
+void drawStamina(){
+    glPushMatrix();
+    glViewport(0, 0, windowWidth, windowHeight);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, windowWidth, windowHeight, 0, -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    
+    
+    glColor3ub(0, 240, 100);//verde
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(15, windowHeight-10);
+    glVertex2f(100, windowHeight-10);
+    glVertex2f(100, windowHeight-30);
+    glVertex2f(15, windowHeight-30);
+    
+    glEnd();
+    
+    glBegin(GL_LINE_LOOP);
+    
+    glVertex2f(20, windowHeight-15);
+    glVertex2f(95, windowHeight-15);
+    glVertex2f(95, windowHeight-25);
+    glVertex2f(20, windowHeight-25);
+    
+    glEnd();
+    
+    glPopMatrix();
+}
 
 float billbilinearInterpolation(float x, float z) {
 	x = x / 4 + 128;
@@ -344,63 +410,23 @@ float billbilinearInterpolation(float x, float z) {
 	return ((y2 - z) / (y2 - y1)) * r1 + ((z - y1) / (y2 - y1)) * r2;
 }
 
-void desenhaMaquina() {
-	glPushMatrix();
-		glColor3d(50.0, 0.0, 0.0);
-		glTranslatef(0.0, 25.0, 0.0);
-		glScalef(2.0, 2.0, 2.0);
-	glPopMatrix();
-}
-
-void drawCrosshair() {
-	glPushMatrix();
-	glViewport(0, 0, windowWidth, windowHeight);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glOrtho(0, windowWidth, windowHeight, 0, -1, 1);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-
-
-	glColor3ub(0, 240, 100);//white
-	glLineWidth(2.0);
-	glBegin(GL_LINES);
-	//horizontal line
-	glVertex2i(windowWidth / 2 - 7, windowHeight / 2);
-	glVertex2i(windowWidth / 2 + 7, windowHeight / 2);
-	glEnd();
-	//vertical line
-	glBegin(GL_LINES);
-	glVertex2i(windowWidth / 2, windowHeight / 2 + 7);
-	glVertex2i(windowWidth / 2, windowHeight / 2 - 7);
-	glEnd();
-	glLineWidth(1.0);
-	glPopMatrix();
-}
-
-void drawWeapon() {
-	glPushMatrix();
-		glMatrixMode(GL_PROJECTION);
-		glLoadIdentity();
-		gluPerspective(fov, ratio, nearDist, farDist);
-		glMatrixMode(GL_MODELVIEW);
-		glLoadIdentity();
-		gluLookAt(0, -100, 0, 1, -100, 0, 0.0, 1.0, 0.0);
-		glFrontFace(GL_CCW);
-		glTranslatef(0.9, -100.2, 0.3);
-		glRotatef(190, 0, 1, 0);
-		glRotatef(-5, 0, 0, 1);
-		DrawFrame();
-		glFrontFace(GL_CW);
-	glPopMatrix();
-}
 
 void desenha() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
+    
+    /* HUD */
+    glViewport(0,0,windowWidth,windowHeight);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluOrtho2D(10,-10,10,-10);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    
+    showFps();
 	handleMovement();
 	//glEnable(GL_DEPTH_TEST);
-
+    
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	gluPerspective(fov, ratio, nearDist, farDist);
@@ -416,29 +442,31 @@ void desenha() {
 		tmpPosY = (billbilinearInterpolation(playerPosXZ[0], playerPosXZ[1]) / 256.0) * 70 + 2;
 		velocidadeY = 0;
 	}
-
+    
+    
+    
 	gluLookAt(playerPosXZ[0], tmpPosY, playerPosXZ[1], playerPosXZ[0] + mousePosXYZ[0], tmpPosY + mousePosXYZ[1], playerPosXZ[1] + mousePosXYZ[2], 0.0, 1.0, 0.0);
 
-	
-	desenhaTerreno();
-	//desenhaMaquina();
-	//desenhaSeta(5);
+	/*desenhaReferencial();
+	glPushMatrix();
+	glRotatef(23, 0, 1, 0);
+	glScalef(1, 1.4, 2);
+	desenhaObjecto();
+	glPopMatrix();*/
+    desenhaTerreno();
+    drawCrosshair();
+    drawStamina();
+    //drawHud();
+    
+    
+    desenhaSeta(5);
 	GLfloat Hnear = 2 * tan(fov / 2) * nearDist;
 	GLfloat Wnear = Hnear * ratio;
 	GLfloat Hfar = 2 * tan(fov / 2) * farDist;
 	GLfloat	Wfar = Hfar * ratio;
 	//glFrustum(-Wfar / 2, Wfar / 2, -Hfar / 2, Hfar / 2, nearDist, farDist);
+    
 	updateAndDisplayFPS();
-	//glLoadIdentity();
-	/*glPushMatrix();
-		glFrontFace(GL_CCW);
-		glTranslatef(playerPosXZ[0] + mousePosXYZ[0], tmpPosY + mousePosXYZ[1] - 0.3, playerPosXZ[1] + mousePosXYZ[2]);
-		glRotatef(cameraAngleY + 110, 0, 1, 0);
-		DrawFrame();
-		glFrontFace(GL_CW);
-	glPopMatrix();*/
-	drawWeapon();
-	drawCrosshair();
 	glutSwapBuffers();
 }
 
@@ -472,7 +500,6 @@ void teclasNotAscii(int key, int x, int y)
 void teclado(unsigned char key, int x, int y) {
 	switch (key) {
 	case 27:	// ESC
-		UnloadModel();
 		exit(0);
 		break;
 	case 119:	// W
@@ -558,8 +585,6 @@ void onMotion(int x, int y) {
 	}
 }
 
-
-
 int main(int argc, char** argv) {
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
@@ -569,7 +594,7 @@ int main(int argc, char** argv) {
 	//glutFullScreen();
 	init();
 	glViewport(0, 0, (GLsizei)windowWidth, (GLsizei)windowHeight);
-	InitApp("model/autorifle.obj");
+
 	glutDisplayFunc(desenha);
 	glutKeyboardFunc(teclado);
 	glutKeyboardUpFunc(tecladoUp);
@@ -587,7 +612,6 @@ int main(int argc, char** argv) {
 	mouseScreenPosXY[1] = windowHeight / 2;
 	glutMainLoop();
 
-	
 
 	return 0;
 }

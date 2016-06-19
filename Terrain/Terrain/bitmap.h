@@ -23,7 +23,7 @@
 #if !defined(BITMAP_H)
 #define BITMAP_H
 
-#include <windows.h>
+//#include <windows.h>
 #include <tchar.h>
 
 //-----------------------------------------------------------------------------

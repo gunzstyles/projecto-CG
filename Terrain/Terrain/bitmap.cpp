@@ -22,13 +22,23 @@
 
 #pragma comment (lib, "olepro32.lib")   // for IPicture COM interface support
 
-#include <windows.h>
+//#include <windows.h>
 #include <olectl.h.>    // for OleLoadPicture() and IPicture COM interface
 #include <cmath>
 #include <cstring>
 #include <vector>
 #include "bitmap.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
+#include <time.h>
 
+#ifdef __APPLE__
+#include <OpenGL/OpenGL.h>
+#include <GLUT/glut.h>
+#else
+#include <GL/glut.h>
+#endif
 namespace
 {
 #pragma pack(push, 1)
