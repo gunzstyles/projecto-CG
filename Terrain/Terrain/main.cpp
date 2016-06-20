@@ -5,6 +5,9 @@
 #include <iostream>
 #include <fstream>
 
+#include "helper.h"
+#include "header.h"
+
 #ifdef __APPLE__
 #include <OpenGL/OpenGL.h>
 #include <GLUT/glut.h>
@@ -26,8 +29,15 @@ float colorMap256[256 * 256][3];
 int mapMinHeight = 20;
 int windowWidth = 800, windowHeight = 600;
 float check, colorScale;
+float fps;
+int countTiros = 0, countTirosOnTraget = 0;
 
-GLfloat fov = 65.0, ratio = (GLdouble)windowWidth / windowHeight, nearDist = 1.0, farDist = 300.0;
+GLfloat fov = 65.0, ratio = (GLdouble)windowWidth / windowHeight, nearDist = 0.1, farDist = 300.0;
+
+float pratoOnScreen[4] = { 0 };
+GLfloat pratoVelXYZ[3] = { 0, 0, 0 };
+GLfloat pratoPosXYZ[3] = { 0, 0, 0 };
+int pratoRaio = 5;
 
 GLfloat playerPosXZ[2] = { 0, 0 };
 GLfloat mouseScreenPosXY[2] = { 0, 0 };
@@ -45,9 +55,6 @@ GLfloat nevoeiroCor[] = { 0.0, 0.0, 0.0, 1.0 };
 double lastTime = 0;
 int nbFrames = 0;
 
-/* HUD fps*/
-int frameCount;
-float currentTime,previousTime,fps;
 
 float noise(int x, int y, int aleatorio) {
 	int n = x + y * 57 + aleatorio * 131;
@@ -132,6 +139,38 @@ void expFilter(float  *mapa) {
 	}
 }
 
+void getNormal(GLfloat *nV, GLfloat *v1, GLfloat *v2, GLfloat *v3) {
+	float tmpVec1[3], tmpVec2[3];
+	tmpVec1[0] = v3[0] - v1[0];
+	tmpVec1[1] = v3[1] - v1[1];
+	tmpVec1[2] = v3[2] - v1[2];
+	tmpVec2[0] = v2[0] - v1[0];
+	tmpVec2[1] = v2[1] - v1[1];
+	tmpVec2[2] = v2[2] - v1[2];
+	nV[0] = v1[1] * v2[2] - v1[2]*v2[1];
+	nV[1] = v1[2] * v2[0] - v1[0] * v2[2];
+	nV[2] = v1[0] * v2[1] - v1[1] * v2[0];
+}
+
+float billbilinearInterpolation(float x, float z) {
+	x = x / 4 + 128;
+	z = z / 4 + 128;
+	int x1 = (int)x;
+	int x2 = (int)x + 1;
+	int y1 = (int)z;
+	int y2 = (int)z + 1;
+
+	float q11 = mapa256[x1 * 256 + y1];
+	float q12 = mapa256[x1 * 256 + y2];
+	float q21 = mapa256[x2 * 256 + y1];
+	float q22 = mapa256[x2 * 256 + y2];
+
+	float r1 = ((x2 - x) / (x2 - x1)) * q11 + ((x - x1) / (x2 - x1)) * q21;
+	float r2 = ((x2 - x) / (x2 - x1)) * q12 + ((x - x1) / (x2 - x1)) * q22;
+	//printf("%f.2, %f.2 = %f.4\n", x, z, ((y2 - z) / (y2 - y1)) * r1 + ((z - y1) / (y2 - y1)) * r2);
+	return ((y2 - z) / (y2 - y1)) * r1 + ((z - y1) / (y2 - y1)) * r2;
+}
+
 void loop() {
 	sobrepoeOitavas(mapa32, mapa256);
 	expFilter(mapa256);
@@ -144,6 +183,66 @@ void initNevoeiro(void) {
 	glFogf(GL_FOG_START, 1.0); // Dist‰ncia a que ter‡ in’cio o nevoeiro
 	glFogf(GL_FOG_END, 200.0); // Dist‰ncia a que o nevoeiro terminar‡
 	glFogf(GL_FOG_DENSITY, 0.01);//glFogf (GL_FOG_DENSITY, 0.35); //Densidade do nevoeiro - n‹o se especifica quando temos "nevoeiro linear"
+}
+
+void defineLuzes() {
+	glEnable(GL_LIGHTING); //turns the "lights" on 
+
+	GLfloat lampPos[4] = { 10.0,100.0,10.0,1.0 };
+	GLfloat lampDir[4] = { 0,-1,0,1.0 };
+
+
+	GLfloat lampIntensity[4] = { 0.8,0.8,0.8,1.0 };
+	GLfloat lampSpecular[4] = { 0.2,0.2,0.2,1.0 };
+	GLfloat mat_amb[] = { 1, 1, 1, 1.0 };
+
+	glLightfv(GL_LIGHT0, GL_POSITION, lampPos);
+	glLightfv(GL_LIGHT0, GL_AMBIENT, lampIntensity);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, mat_amb);
+	glLightfv(GL_LIGHT0, GL_SPECULAR, lampSpecular);
+	glLightf(GL_LIGHT0, GL_SPOT_CUTOFF, 3.0);
+	glLightfv(GL_LIGHT0, GL_SPOT_DIRECTION, lampDir);
+	glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 1);
+
+	glEnable(GL_LIGHT0);
+
+	glEnable(GL_COLOR_MATERIAL);
+}
+
+void resetPrato() {
+	pratoPosXYZ[0] = playerPosXZ[0] + (rand() % 200 - 100);
+	pratoPosXYZ[2] = playerPosXZ[1] + (rand() % 200 - 100);
+	pratoPosXYZ[1] = billbilinearInterpolation(pratoPosXYZ[0], pratoPosXYZ[2]) / 256.0 * 70;
+	pratoVelXYZ[1] = 0.5;
+	pratoVelXYZ[0] = (rand() % 1) * 0.2 - 0.4;
+	pratoVelXYZ[2] = (rand() % 1) * 0.2 - 0.4;
+}
+
+void drawText(char *string, GLfloat x, GLfloat y, GLfloat z) {
+	glRasterPos3f(x, y, z);
+	while (*string)
+		glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, *string++);
+}
+
+void showFps() {
+	/* HUD */
+	glViewport(0, 0, windowWidth, windowHeight);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluOrtho2D(10, -10, 10, -10);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	char text[100] = "";
+	glColor3f(0, 1, 1);
+	sprintf(text, "FPS: %.1f", fps);
+	drawText(text, -7, -8.5f, 1);
+}
+
+void showNTiros() {
+	char text[100] = "";
+	glColor3f(0, 1, 1);
+	sprintf(text, "Shots: %d, Landed: %d", countTiros, countTirosOnTraget);
+	drawText(text, 0, -8.5, 1);
 }
 
 void init() {
@@ -159,6 +258,7 @@ void init() {
 
 
 	/*ACTIVAR FRONT FACE CULLING*/
+
 	glEnable(GL_CULL_FACE);
 	glFrontFace(GL_CW);
 	// ENABLE DEPTH TEST
@@ -196,6 +296,9 @@ void init() {
 
 	colorScale = abs(min - max);
 	printf("min: %d - max: %d - diff: %d\n", (int)min, (int)max, (int)abs(min - max));
+	//defineLuzes();
+	//glEnable(GL_LIGHT0);
+	resetPrato();
 }
 
 void updateAndDisplayFPS() {
@@ -203,28 +306,29 @@ void updateAndDisplayFPS() {
 	nbFrames++;
 	if (currentTime - lastTime >= 1000.0) {
 		printf("%.2f ms/frame\n", float(nbFrames*1000.0 / (currentTime - lastTime)));
-        fps =float(nbFrames*1000.0 / (currentTime - lastTime));
+		fps = float(nbFrames*1000.0 / (currentTime - lastTime));
 		nbFrames = 0;
 		lastTime = currentTime;
 	}
 }
 
 void handleMovement() {
+	GLfloat speed = 1;
 	if (wasd[0]) {
-		playerPosXZ[0] += sin(cameraAngleY * M_PI / 180) * 0.2;
-		playerPosXZ[1] += cos(cameraAngleY * M_PI / 180) * 0.2;
+		playerPosXZ[0] += sin(cameraAngleY * M_PI / 180) * speed;
+		playerPosXZ[1] += cos(cameraAngleY * M_PI / 180) * speed;
 	}
 	if (wasd[1]) {
-		playerPosXZ[0] += sin((cameraAngleY + 90) * M_PI / 180) * 0.2;
-		playerPosXZ[1] += cos((cameraAngleY + 90)* M_PI / 180) * 0.2;
+		playerPosXZ[0] += sin((cameraAngleY + 90) * M_PI / 180) * speed;
+		playerPosXZ[1] += cos((cameraAngleY + 90)* M_PI / 180) * speed;
 	}
 	if (wasd[2]) {
-		playerPosXZ[0] += sin((cameraAngleY - 180)* M_PI / 180) * 0.2;
-		playerPosXZ[1] += cos((cameraAngleY - 180)* M_PI / 180) * 0.2;
+		playerPosXZ[0] += sin((cameraAngleY - 180)* M_PI / 180) * speed;
+		playerPosXZ[1] += cos((cameraAngleY - 180)* M_PI / 180) * speed;
 	}
 	if (wasd[3]) {
-		playerPosXZ[0] += sin((cameraAngleY - 90)* M_PI / 180) * 0.2;
-		playerPosXZ[1] += cos((cameraAngleY - 90)* M_PI / 180) * 0.2;
+		playerPosXZ[0] += sin((cameraAngleY - 90)* M_PI / 180) * speed;
+		playerPosXZ[1] += cos((cameraAngleY - 90)* M_PI / 180) * speed;
 	}
 	//printf("%f, %f\n", playerPosXZ[0], playerPosXZ[1]);
 }
@@ -234,21 +338,47 @@ void desenhaTerreno() {
 	glEnable(GL_POLYGON_OFFSET_FILL); // Avoid Stitching!
 	glPolygonOffset(1.0, 1.0);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	for (int i = 0; i < 256; i++) {
+	glColor3f(0.0, 0.0, 0.0);
+	GLfloat v1[3], v2[3], v3[3], nV[3];
+	/*glEnable(GL_COLOR_MATERIAL);
+	GLfloat whiteSpecularMaterial[] = { 0.0, 0.0, 0.0 };
+	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, whiteSpecularMaterial);*/
+	for (int i = 0; i < 256 - 1; i++) {
 		glBegin(GL_TRIANGLE_STRIP);
-		for (int j = 0; j < 256 - 1; j++) {
-			glColor3f(0.0, 0.0, 0.0);
+		for (int j = 0; j < 256; j++) {
+			if (j > 0) {
+				v3[0] = (i - 128) * 4.0;
+				v3[1] = (mapa256[i * 256 + j] / 256.0) * 70;
+				v3[2] = (j - 128) * 4.0;
+				getNormal(nV, v1, v2, v3);
+				glNormal3f(nV[0], nV[1], nV[2]);
+			}
 			glVertex3f((i - 128) * 4.0, (mapa256[i * 256 + j] / 256.0) * 70, (j - 128) * 4.0);
-			glColor3f(0.0, 0.0, 0.0);
+			if (j > 0) {
+				v1[0] = v3[0];
+				v1[1] = v3[1];
+				v1[2] = v3[2];
+				v3[0] = (i - 127) * 4.0;
+				v3[1] = (mapa256[(i + 1) * 256 + j] / 256.0) * 70;
+				v3[2] = (j - 128) * 4.0;
+				getNormal(nV, v1, v2, v3);
+				glNormal3f(nV[0], nV[1], nV[2]);
+			}
 			glVertex3f((i - 127) * 4.0, (mapa256[(i + 1) * 256 + j] / 256.0) * 70, (j - 128) * 4.0);
+			v1[0] = (i - 128) * 4.0;
+			v1[1] = (mapa256[i * 256 + j] / 256.0) * 70;
+			v1[2] = (j - 128) * 4.0;
+			v2[0] = (i - 127) * 4.0;
+			v2[1] = (mapa256[(i + 1) * 256 + j] / 256.0) * 70;
+			v2[2] = (j - 128) * 4.0;
 		}
 		glEnd();
 	}
 	glDisable(GL_POLYGON_OFFSET_FILL);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	for (int i = 0; i < 256; i++) {
+	for (int i = 0; i < 256 - 1; i++) {
 		glBegin(GL_TRIANGLE_STRIP);
-		for (int j = 0; j < 256 - 1; j++) {
+		for (int j = 0; j < 256; j++) {
 			glColor3f(colorMap256[i * 256 + j][0], colorMap256[i * 256 + j][1], colorMap256[i * 256 + j][2]);
 			glVertex3f((i - 128) * 4.0, (mapa256[i * 256 + j] / 256.0) * 70, (j - 128) * 4.0);
 			glColor3f(colorMap256[i * 256 + j][0], colorMap256[(i + 1) * 256 + j][1], colorMap256[i * 256 + j][2]);
@@ -256,183 +386,147 @@ void desenhaTerreno() {
 		}
 		glEnd();
 	}
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glShadeModel(GL_FLAT);
+	
 }
 
-/* TODO: SETA*/
-/* onde comea e acaba a arrow e a sua espessura*/
-void Arrow(GLdouble x1, GLdouble y1, GLdouble z1, GLdouble x2, GLdouble y2, GLdouble z2, GLdouble D) {
-	double x = x2 - x1;
-	double y = y2 - y1;
-	double z = z2 - z1;
-	double L = sqrt(x*x + y*y + z*z);
-
-	GLUquadricObj *quadObj;
-
+void desenhaMaquina() {
 	glPushMatrix();
-
-	glTranslated(x1, y1, z1);
-
-	if ((x != 0.) || (y != 0.)) {
-		glRotated(atan2(y, x) / RADPERDEG, 0., 0., 1.);
-		glRotated(atan2(sqrt(x*x + y*y), z) / RADPERDEG, 0., 1., 0.);
-	}
-	else if (z<0) {
-		glRotated(180, 1., 0., 0.);
-	}
-
-	glTranslatef(0, 0, L - 4 * D);
-
-	quadObj = gluNewQuadric();
-	gluQuadricDrawStyle(quadObj, GLU_FILL);
-	gluQuadricNormals(quadObj, GLU_SMOOTH);
-	gluCylinder(quadObj, 2 * D, 0.0, 4 * D, 32, 1);
-	gluDeleteQuadric(quadObj);
-
-	quadObj = gluNewQuadric();
-	gluQuadricDrawStyle(quadObj, GLU_FILL);
-	gluQuadricNormals(quadObj, GLU_SMOOTH);
-	gluDisk(quadObj, 0.0, 2 * D, 32, 1);
-	gluDeleteQuadric(quadObj);
-
-	glTranslatef(0, 0, -L + 4 * D);
-
-	quadObj = gluNewQuadric();
-	gluQuadricDrawStyle(quadObj, GLU_FILL);
-	gluQuadricNormals(quadObj, GLU_SMOOTH);
-	gluCylinder(quadObj, D, D, L - 4 * D, 32, 1);
-	gluDeleteQuadric(quadObj);
-
-	quadObj = gluNewQuadric();
-	gluQuadricDrawStyle(quadObj, GLU_FILL);
-	gluQuadricNormals(quadObj, GLU_SMOOTH);
-	gluDisk(quadObj, 0.0, D, 32, 1);
-	gluDeleteQuadric(quadObj);
-
+		glColor3d(50.0, 0.0, 0.0);
+		glTranslatef(0.0, 25.0, 0.0);
+		glScalef(2.0, 2.0, 2.0);
 	glPopMatrix();
-
 }
 
-void desenhaSeta(GLdouble length) {
+void drawCircle(float cx, float cy, float r, int num_segments)
+{
+	float theta = 2 * 3.1415926 / float(num_segments);
+	float tangetial_factor = tanf(theta);//calculate the tangential factor 
+
+	float radial_factor = cosf(theta);//calculate the radial factor 
+
+	float x = r;//we start at angle = 0 
+
+	float y = 0;
+
+	glBegin(GL_TRIANGLE_FAN);
+	for (int ii = 0; ii < num_segments; ii++)
+	{
+		glVertex2f(x + cx, y + cy);//output vertex 
+
+								   //calculate the tangential vector 
+								   //remember, the radial vector is (x, y) 
+								   //to get the tangential vector we flip those coordinates and negate one of them 
+
+		float tx = -y;
+		float ty = x;
+
+		//add the tangential vector 
+
+		x += tx * tangetial_factor;
+		y += ty * tangetial_factor;
+
+		//correct using the radial factor 
+
+		x *= radial_factor;
+		y *= radial_factor;
+	}
+	glEnd();
+}
+
+void desenhaPrato() {
+	glDisable(GL_CULL_FACE);
+	glShadeModel(GL_SMOOTH);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	glColor4f(ORANGE);
 	glPushMatrix();
-	glTranslatef(0, 0, -length);
-	Arrow(0, 0, 0, 0, 0, 2 * length, 0.2);
+		glTranslatef(pratoPosXYZ[0], pratoPosXYZ[1], pratoPosXYZ[2]);
+		float prjMat[4][4] = { 0 }, modViewMat[4][4] = { 0 };
+		glGetFloatv(GL_PROJECTION_MATRIX, &prjMat[0][0]);
+		glGetFloatv(GL_MODELVIEW_MATRIX, &modViewMat[0][0]);
+		for (int i = 0; i < 4; i++) {
+			float val = 0;
+			for (int j = 0; j < 4; j++) {
+				val += prjMat[i][j] * modViewMat[3][j];
+			}
+			pratoOnScreen[i] = val;
+		}
+		//printf("%f, %f, %f\n", ve[0], ve[1], ve[2]);
+		//glScalef(1, 0.8, 1);
+		glRotatef(cameraAngleY, 0, 1, 0);
+		drawCircle(0, 0, pratoRaio, 300);
 	glPopMatrix();
+	
+	glEnable(GL_CULL_FACE);
+	pratoPosXYZ[1] += pratoVelXYZ[1];
+	pratoVelXYZ[1] -= 0.0025;
+	pratoPosXYZ[0] += pratoVelXYZ[0];
+	pratoPosXYZ[2] += pratoVelXYZ[2];
+	if (pratoPosXYZ[1] <= billbilinearInterpolation(pratoPosXYZ[0], pratoPosXYZ[2]) / 256.0 * 70)
+		resetPrato();
 }
 
 void drawCrosshair() {
-    glPushMatrix();
-    glViewport(0, 0, windowWidth, windowHeight);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(0, windowWidth, windowHeight, 0, -1, 1);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    
-    
-    glColor3ub(0, 240, 100);//verde
-    glLineWidth(2.0);
-    glBegin(GL_LINES);
-    //horizontal line
-    glVertex2i(windowWidth / 2 - 7, windowHeight / 2);
-    glVertex2i(windowWidth / 2 + 7, windowHeight / 2);
-    glEnd();
-    //vertical line
-    glBegin(GL_LINES);
-    glVertex2i(windowWidth / 2, windowHeight / 2 + 7);
-    glVertex2i(windowWidth / 2, windowHeight / 2 - 7);
-    glEnd();
-    glLineWidth(1.0);
-    glPopMatrix();
+	glPushMatrix();
+	glViewport(0, 0, windowWidth, windowHeight);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(0, windowWidth, windowHeight, 0, -1, 1);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+
+	glColor3ub(0, 240, 100);//white
+	glLineWidth(2.0);
+	glBegin(GL_LINES);
+	//horizontal line
+	glVertex2i(windowWidth / 2 - 7, windowHeight / 2);
+	glVertex2i(windowWidth / 2 + 7, windowHeight / 2);
+	glEnd();
+	//vertical line
+	glBegin(GL_LINES);
+	glVertex2i(windowWidth / 2, windowHeight / 2 + 7);
+	glVertex2i(windowWidth / 2, windowHeight / 2 - 7);
+	glEnd();
+	glLineWidth(1.0);
+	glPopMatrix();
 }
 
-
-void drawText(char *string, GLfloat x, GLfloat y, GLfloat z){
-    glRasterPos3f(x, y, z);
-    while (*string)
-        glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, *string++);
+void drawWeapon() {
+	glPushMatrix();
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
+		gluPerspective(fov, ratio, nearDist, farDist);
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+		gluLookAt(0, -100, 0, 1, -100, 0, 0.0, 1.0, 0.0);
+		glFrontFace(GL_CCW);
+		glTranslatef(0.9, -100.2, 0.3);
+		glRotatef(190, 0, 1, 0);
+		glRotatef(-5, 0, 0, 1);
+		DrawFrame();
+		glFrontFace(GL_CW);
+	glPopMatrix();
 }
-
-void showFps(){
-    char text[100] = "";
-    glColor3f(0,1,1);
-    sprintf(text, "FPS: %.1f", fps);
-    drawText(text, -7, -8.5f, 1);
-}
-
-void drawStamina(){
-    glPushMatrix();
-    glViewport(0, 0, windowWidth, windowHeight);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(0, windowWidth, windowHeight, 0, -1, 1);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    
-    
-    glColor3ub(0, 240, 100);//verde
-    glBegin(GL_LINE_LOOP);
-    glVertex2f(15, windowHeight-10);
-    glVertex2f(100, windowHeight-10);
-    glVertex2f(100, windowHeight-30);
-    glVertex2f(15, windowHeight-30);
-    
-    glEnd();
-    
-    glBegin(GL_LINE_LOOP);
-    
-    glVertex2f(20, windowHeight-15);
-    glVertex2f(95, windowHeight-15);
-    glVertex2f(95, windowHeight-25);
-    glVertex2f(20, windowHeight-25);
-    
-    glEnd();
-    
-    glPopMatrix();
-}
-
-float billbilinearInterpolation(float x, float z) {
-	x = x / 4 + 128;
-	z = z / 4 + 128;
-	int x1 = (int)x;
-	int x2 = (int)x + 1;
-	int y1 = (int)z;
-	int y2 = (int)z + 1;
-
-	float q11 = mapa256[x1 * 256 + y1];
-	float q12 = mapa256[x1 * 256 + y2];
-	float q21 = mapa256[x2 * 256 + y1];
-	float q22 = mapa256[x2 * 256 + y2];
-
-	float r1 = ((x2 - x) / (x2 - x1)) * q11 + ((x - x1) / (x2 - x1)) * q21;
-	float r2 = ((x2 - x) / (x2 - x1)) * q12 + ((x - x1) / (x2 - x1)) * q22;
-	//printf("%f.2, %f.2 = %f.4\n", x, z, ((y2 - z) / (y2 - y1)) * r1 + ((z - y1) / (y2 - y1)) * r2);
-	return ((y2 - z) / (y2 - y1)) * r1 + ((z - y1) / (y2 - y1)) * r2;
-}
-
 
 void desenha() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+
 	
-    
-    /* HUD */
-    glViewport(0,0,windowWidth,windowHeight);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluOrtho2D(10,-10,10,-10);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    
-    showFps();
+	showFps();
+	showNTiros();
 	handleMovement();
 	//glEnable(GL_DEPTH_TEST);
-    
+	
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	gluPerspective(fov, ratio, nearDist, farDist);
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
+	//defineLuzes();
 	GLfloat tmpPosY = (billbilinearInterpolation(playerPosXZ[0], playerPosXZ[1]) / 256.0) * 70 + 2;
 	saltoY += velocidadeY;
 	tmpPosY += saltoY;
@@ -442,31 +536,16 @@ void desenha() {
 		tmpPosY = (billbilinearInterpolation(playerPosXZ[0], playerPosXZ[1]) / 256.0) * 70 + 2;
 		velocidadeY = 0;
 	}
-    
-    
-    
-	gluLookAt(playerPosXZ[0], tmpPosY, playerPosXZ[1], playerPosXZ[0] + mousePosXYZ[0], tmpPosY + mousePosXYZ[1], playerPosXZ[1] + mousePosXYZ[2], 0.0, 1.0, 0.0);
 
-	/*desenhaReferencial();
-	glPushMatrix();
-	glRotatef(23, 0, 1, 0);
-	glScalef(1, 1.4, 2);
-	desenhaObjecto();
-	glPopMatrix();*/
-    desenhaTerreno();
-    drawCrosshair();
-    drawStamina();
-    //drawHud();
-    
-    
-    desenhaSeta(5);
-	GLfloat Hnear = 2 * tan(fov / 2) * nearDist;
-	GLfloat Wnear = Hnear * ratio;
-	GLfloat Hfar = 2 * tan(fov / 2) * farDist;
-	GLfloat	Wfar = Hfar * ratio;
-	//glFrustum(-Wfar / 2, Wfar / 2, -Hfar / 2, Hfar / 2, nearDist, farDist);
-    
+	gluLookAt(playerPosXZ[0], tmpPosY, playerPosXZ[1], playerPosXZ[0] + mousePosXYZ[0], tmpPosY + mousePosXYZ[1], playerPosXZ[1] + mousePosXYZ[2], 0.0, 1.0, 0.0);
+	
+	desenhaTerreno();
+	desenhaPrato();
+
 	updateAndDisplayFPS();
+	drawWeapon();
+	drawCrosshair();
+	
 	glutSwapBuffers();
 }
 
@@ -500,6 +579,7 @@ void teclasNotAscii(int key, int x, int y)
 void teclado(unsigned char key, int x, int y) {
 	switch (key) {
 	case 27:	// ESC
+		UnloadModel();
 		exit(0);
 		break;
 	case 119:	// W
@@ -550,20 +630,22 @@ void tecladoUp(unsigned char key, int x, int y) {
 }
 
 void onMouse(int button, int state, int x, int y) {
-	/*if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-	arcball_on = true;
-	last_mx = cur_mx = x;
-	last_my = cur_my = y;
+	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+		countTiros++;
+		printf("SHOOOT: %f, %f, %f\n", pratoOnScreen[0] , pratoOnScreen[1], pratoOnScreen[2]);
+		if ((pratoOnScreen[0] < pratoRaio && pratoOnScreen[0] > -pratoRaio) && (pratoOnScreen[1] < pratoRaio && pratoOnScreen[1] > -pratoRaio)) {
+			printf("SHOOOT ON TARGET WELELELELELELELEEE\n");
+			resetPrato();
+			countTirosOnTraget++;
+		}
 	}
-	else {
-	arcball_on = false;
-	}*/
 }
 
 void onMotion(int x, int y) {
 	if (x != windowWidth / 2 || y != windowHeight / 2) {
-		cameraAngleY += windowWidth / 2 - x;
-		cameraAngleX += windowHeight / 2 - y;
+		float reduce = 3;
+		cameraAngleY += (windowWidth / 2 - x) / reduce;
+		cameraAngleX += (windowHeight / 2 - y) / reduce;
 		if (cameraAngleX > 90)
 			cameraAngleX = 90;
 		if (cameraAngleX < -90)
@@ -577,13 +659,15 @@ void onMotion(int x, int y) {
 		mouseScreenPosXY[0] = x;
 		mouseScreenPosXY[1] = y;
 
-		//printf("x: %f z: %f y: %f\n", mouseScreenPosXYZ[0], mouseScreenPosXYZ[2], mouseScreenPosXYZ[1]);
+		//printf("x: %f z: %f y: %f\n", mousePosXYZ[0], mousePosXYZ[2], mousePosXYZ[1]);
 		//glutPostRedisplay();
 
 		glutWarpPointer(windowWidth / 2, windowHeight / 2);
 		//SetCursorPos(windowWidth / 2, windowHeight / 2);
 	}
 }
+
+
 
 int main(int argc, char** argv) {
 	glutInit(&argc, argv);
@@ -594,7 +678,7 @@ int main(int argc, char** argv) {
 	//glutFullScreen();
 	init();
 	glViewport(0, 0, (GLsizei)windowWidth, (GLsizei)windowHeight);
-
+	InitApp("model/autorifle.obj");
 	glutDisplayFunc(desenha);
 	glutKeyboardFunc(teclado);
 	glutKeyboardUpFunc(tecladoUp);
@@ -612,6 +696,7 @@ int main(int argc, char** argv) {
 	mouseScreenPosXY[1] = windowHeight / 2;
 	glutMainLoop();
 
+	
 
 	return 0;
 }
