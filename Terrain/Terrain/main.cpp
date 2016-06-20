@@ -29,7 +29,7 @@ float colorMap256[256 * 256][3];
 int mapMinHeight = 20;
 int windowWidth = 800, windowHeight = 600;
 float check, colorScale;
-float fps;
+float fps, pratoDead = false;
 int countTiros = 0, countTirosOnTraget = 0;
 
 GLfloat fov = 65.0, ratio = (GLdouble)windowWidth / windowHeight, nearDist = 0.1, farDist = 300.0;
@@ -37,6 +37,8 @@ GLfloat fov = 65.0, ratio = (GLdouble)windowWidth / windowHeight, nearDist = 0.1
 float pratoOnScreen[4] = { 0 };
 GLfloat pratoVelXYZ[3] = { 0, 0, 0 };
 GLfloat pratoPosXYZ[3] = { 0, 0, 0 };
+GLfloat pratoRotRand[15] = { 0 };
+GLfloat pratoRandTrans = 0, pratoTransp = 100.0;
 int pratoRaio = 5;
 
 GLfloat playerPosXZ[2] = { 0, 0 };
@@ -233,14 +235,21 @@ void showFps() {
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	char text[100] = "";
-	glColor3f(0, 1, 1);
+	glColor4f(0, 1, 1, 1);
 	sprintf(text, "FPS: %.1f", fps);
 	drawText(text, -7, -8.5f, 1);
 }
 
 void showNTiros() {
+	/* HUD */
+	glViewport(0, 0, windowWidth, windowHeight);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluOrtho2D(10, -10, 10, -10);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
 	char text[100] = "";
-	glColor3f(0, 1, 1);
+	glColor4f(0, 1, 1, 1);
 	sprintf(text, "Shots: %d, Landed: %d", countTiros, countTirosOnTraget);
 	drawText(text, 0, -8.5, 1);
 }
@@ -295,7 +304,14 @@ void init() {
 		}
 
 	colorScale = abs(min - max);
-	printf("min: %d - max: %d - diff: %d\n", (int)min, (int)max, (int)abs(min - max));
+
+	pratoTransp = 100.0;
+	pratoRandTrans = 0;
+	for (int i = 0; i < 15; i++) {
+		pratoRotRand[i] = rand() % 360;
+	}
+
+	//printf("min: %d - max: %d - diff: %d\n", (int)min, (int)max, (int)abs(min - max));
 	//defineLuzes();
 	//glEnable(GL_LIGHT0);
 	resetPrato();
@@ -305,7 +321,7 @@ void updateAndDisplayFPS() {
 	double currentTime = glutGet(GLUT_ELAPSED_TIME);
 	nbFrames++;
 	if (currentTime - lastTime >= 1000.0) {
-		printf("%.2f ms/frame\n", float(nbFrames*1000.0 / (currentTime - lastTime)));
+		//printf("%.2f ms/frame\n", float(nbFrames*1000.0 / (currentTime - lastTime)));
 		fps = float(nbFrames*1000.0 / (currentTime - lastTime));
 		nbFrames = 0;
 		lastTime = currentTime;
@@ -435,12 +451,23 @@ void drawCircle(float cx, float cy, float r, int num_segments)
 	glEnd();
 }
 
+void desenhaPratoFalso() {
+	for (int i = 0; i < 15; i++) {
+		glPushMatrix();
+			glRotatef(pratoRotRand[i], 0, 1, 0);
+			glTranslatef(pratoRandTrans, 0, 0);
+			drawCircle(0, 0, 1, 300);
+		glPopMatrix();
+	}
+}
+
 void desenhaPrato() {
 	glDisable(GL_CULL_FACE);
-	glShadeModel(GL_SMOOTH);
+	//glShadeModel(GL_SMOOTH);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	glColor4f(ORANGE);
-	glPushMatrix();
+	glColor4f(100.0, 65.0, 0.0, pratoTransp);
+	if (!pratoDead) {
+		glPushMatrix();
 		glTranslatef(pratoPosXYZ[0], pratoPosXYZ[1], pratoPosXYZ[2]);
 		float prjMat[4][4] = { 0 }, modViewMat[4][4] = { 0 };
 		glGetFloatv(GL_PROJECTION_MATRIX, &prjMat[0][0]);
@@ -456,16 +483,37 @@ void desenhaPrato() {
 		//glScalef(1, 0.8, 1);
 		glRotatef(cameraAngleY, 0, 1, 0);
 		drawCircle(0, 0, pratoRaio, 300);
-	glPopMatrix();
-	
+		glPopMatrix();
+
+		pratoPosXYZ[1] += pratoVelXYZ[1];
+		pratoVelXYZ[1] -= 0.0025;
+		pratoPosXYZ[0] += pratoVelXYZ[0];
+		pratoPosXYZ[2] += pratoVelXYZ[2];
+		if (pratoPosXYZ[1] <= billbilinearInterpolation(pratoPosXYZ[0], pratoPosXYZ[2]) / 256.0 * 70)
+			resetPrato();
+	}
+	else {
+		glPushMatrix();
+			glTranslatef(pratoPosXYZ[0], pratoPosXYZ[1], pratoPosXYZ[2]);
+			desenhaPratoFalso();
+		glPopMatrix();
+		pratoRandTrans += 1;
+		pratoTransp -= 3;
+		//printf("%f\n", pratoTransp);
+		if(pratoTransp < 0) {
+			pratoTransp = 100.0;
+			pratoRandTrans = 0;
+			for (int i = 0; i < 15; i++) {
+				pratoRotRand[i] = rand() % 360;
+			}
+			pratoDead = false;
+			resetPrato();
+		}
+	}
 	glEnable(GL_CULL_FACE);
-	pratoPosXYZ[1] += pratoVelXYZ[1];
-	pratoVelXYZ[1] -= 0.0025;
-	pratoPosXYZ[0] += pratoVelXYZ[0];
-	pratoPosXYZ[2] += pratoVelXYZ[2];
-	if (pratoPosXYZ[1] <= billbilinearInterpolation(pratoPosXYZ[0], pratoPosXYZ[2]) / 256.0 * 70)
-		resetPrato();
 }
+
+
 
 void drawCrosshair() {
 	glPushMatrix();
@@ -513,10 +561,9 @@ void drawWeapon() {
 void desenha() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-
-	
 	showFps();
 	showNTiros();
+	
 	handleMovement();
 	//glEnable(GL_DEPTH_TEST);
 	
@@ -632,11 +679,12 @@ void tecladoUp(unsigned char key, int x, int y) {
 void onMouse(int button, int state, int x, int y) {
 	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
 		countTiros++;
-		printf("SHOOOT: %f, %f, %f\n", pratoOnScreen[0] , pratoOnScreen[1], pratoOnScreen[2]);
-		if ((pratoOnScreen[0] < pratoRaio && pratoOnScreen[0] > -pratoRaio) && (pratoOnScreen[1] < pratoRaio && pratoOnScreen[1] > -pratoRaio)) {
-			printf("SHOOOT ON TARGET WELELELELELELELEEE\n");
-			resetPrato();
+		//printf("SHOOOT: %f, %f, %f\n", pratoOnScreen[0] , pratoOnScreen[1], pratoOnScreen[2]);
+		if ((pratoOnScreen[0] < pratoRaio && pratoOnScreen[0] > -pratoRaio) && (pratoOnScreen[1] < pratoRaio && pratoOnScreen[1] > -pratoRaio) && !pratoDead) {
+			//printf("SHOOOT ON TARGET WELELELELELELELEEE\n");
+			
 			countTirosOnTraget++;
+			pratoDead = true;
 		}
 	}
 }
