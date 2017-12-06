@@ -1,3 +1,4 @@
 # projecto-CG
-1.0
-bla bla
+College project - Computer Graphics
+
+Computer game developed in OpenGL.
